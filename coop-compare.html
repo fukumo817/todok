@@ -668,6 +668,9 @@ document.getElementById('btnReset').addEventListener('click', () => {
   document.getElementById('filterHasGramPrice').checked  = false;
   document.getElementById('sortSelect').value = 'gram_price|asc';
   sortKey = 'gram_price'; sortDir = 'asc';
+  // 選択もすべてクリア
+  selectedItems.clear();
+  updateOrderBar();
   updateSortUI();
   filter();
 });
