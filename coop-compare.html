@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>コープさっぽろ 商品比較</title>
+  <script src="data.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Meiryo", sans-serif;
+      font-size: 13px;
+      background: #f4f6f8;
+      color: #333;
+      padding-bottom: 80px; /* 注文バー分の余白 */
+    }
+
+    header {
+      background: #005bac;
+      color: white;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    header h1 { font-size: 17px; font-weight: bold; }
+    header .count { font-size: 12px; opacity: 0.8; margin-left: auto; }
+
+    .filters {
+      background: white;
+      border-bottom: 1px solid #ddd;
+      padding: 10px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: flex-end;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .filters label {
+      font-size: 11px;
+      color: #666;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .filters select,
+    .filters input[type="text"] {
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 13px;
+      outline: none;
+    }
+    .filters select:focus,
+    .filters input[type="text"]:focus { border-color: #005bac; }
+    .filters input[type="text"] { width: 220px; }
+
+    .toggle-label {
+      display: flex !important;
+      flex-direction: row !important;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      font-size: 13px !important;
+      color: #333 !important;
+      padding-bottom: 2px;
+    }
+    .toggle-label input { width: 15px; height: 15px; cursor: pointer; }
+
+    .btn-reset {
+      background: #eee;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      padding: 6px 14px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: auto;
+    }
+    .btn-reset:hover { background: #ddd; }
+
+    .table-wrap {
+      overflow-x: auto;
+      padding: 12px 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      border-radius: 6px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    thead th {
+      background: #005bac;
+      color: white;
+      padding: 9px 10px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: normal;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    thead th:hover { background: #0070cc; }
+    thead th.sorted { background: #003f7a; }
+    thead th .arrow { margin-left: 4px; font-size: 10px; }
+    thead th.no-sort { cursor: default; }
+    thead th.no-sort:hover { background: #005bac; }
+
+    tbody tr { border-bottom: 1px solid #eee; }
+    tbody tr:hover { background: #f0f6ff; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr.row-selected td { background: #fff8e1 !important; }
+
+    td { padding: 7px 10px; vertical-align: middle; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+    .badge {
+      border-radius: 3px;
+      padding: 1px 6px;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+    .badge-domestic { background: #e8f4e8; color: #2a7a2a; }
+    .badge-import   { background: #f5f5f5; color: #999; }
+
+    .best td { background: #fff8e1; }
+    .best .gram-val { font-weight: bold; color: #b85c00; }
+    tbody tr.row-selected.best td { background: #fdeea0 !important; }
+
+    .gram-null { color: #ccc; }
+    .order-no  { font-size: 11px; color: #888; font-family: monospace; }
+    .cat-cell  { white-space: nowrap; font-size: 12px; }
+    .maker-cell { font-size: 12px; color: #555; max-width: 160px; }
+    .name-cell  { max-width: 280px; }
+
+    /* ===== 選ぶボタン ===== */
+    .select-btn {
+      padding: 5px 14px;
+      font-size: 13px;
+      border: 1px solid #005bac;
+      border-radius: 4px;
+      background: white;
+      color: #005bac;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s;
+    }
+    .select-btn:hover { background: #e8f0fc; }
+    .select-btn.selected {
+      background: #005bac;
+      color: white;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 6px;
+      padding: 12px;
+    }
+    .pagination button {
+      border: 1px solid #ccc;
+      background: white;
+      border-radius: 4px;
+      padding: 4px 12px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .pagination button:hover:not(:disabled) { background: #e8f0fc; border-color: #005bac; }
+    .pagination button:disabled { opacity: 0.35; cursor: default; }
+    .page-info { font-size: 12px; color: #666; min-width: 130px; text-align: center; }
+
+    .no-results { text-align: center; padding: 48px; color: #aaa; font-size: 14px; }
+
+    /* ===== 注文バー（画面下部固定）===== */
+    .order-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #005bac;
+      color: white;
+      padding: 14px 20px;
+      font-size: 16px;
+      font-weight: bold;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.2);
+      cursor: pointer;
+      z-index: 200;
+    }
+    .order-bar.hidden { display: none; }
+    .order-bar-count { font-size: 20px; }
+
+    /* ===== 注文シート ===== */
+    .sheet-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 300;
+    }
+    .sheet-overlay.open { display: block; }
+    .order-sheet {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: white;
+      border-radius: 16px 16px 0 0;
+      padding: 20px 20px 40px;
+      max-height: 80vh;
+      overflow-y: auto;
+      z-index: 301;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+      display: none;
+    }
+    .sheet-title {
+      font-size: 17px;
+      font-weight: bold;
+      margin-bottom: 14px;
+      color: #005bac;
+    }
+    .sheet-item {
+      border-bottom: 1px solid #eee;
+      padding: 10px 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .sheet-item-info { flex: 1; font-size: 14px; line-height: 1.7; }
+    .sheet-item-info .s-name { font-weight: bold; }
+    .sheet-item-info .s-sub  { font-size: 12px; color: #777; }
+    .sheet-item-remove {
+      border: none;
+      background: #eee;
+      border-radius: 50%;
+      width: 30px; height: 30px;
+      font-size: 16px;
+      cursor: pointer;
+      flex-shrink: 0;
+      color: #555;
+    }
+    .sheet-item-remove:hover { background: #ddd; }
+    .copy-btn {
+      width: 100%;
+      margin-top: 18px;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: bold;
+      background: #005bac;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .copy-btn:active { opacity: 0.8; }
+    .copy-done {
+      text-align: center;
+      color: #2a7a2a;
+      font-weight: bold;
+      margin-top: 10px;
+      font-size: 14px;
+      display: none;
+    }
+    .close-sheet-btn {
+      width: 100%;
+      margin-top: 10px;
+      padding: 12px;
+      font-size: 14px;
+      background: #f0f0f0;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🛒 コープさっぽろ 商品比較</h1>
+  <span class="count" id="resultCount"></span>
+</header>
+
+<div class="filters">
+  <label>
+    カテゴリ
+    <select id="filterCategory">
+      <option value="">すべて</option>
+    </select>
+  </label>
+
+  <label>
+    商品名・メーカー検索
+    <input type="text" id="filterSearch" placeholder="例：豚バラ、コープさっぽろ">
+  </label>
+
+  <label>
+    並び順
+    <select id="sortSelect">
+      <option value="gram_price|asc">g単価（安い順）</option>
+      <option value="gram_price|desc">g単価（高い順）</option>
+      <option value="price_taxin|asc">税込価格（安い順）</option>
+      <option value="price_taxin|desc">税込価格（高い順）</option>
+      <option value="name|asc">商品名（あいうえお順）</option>
+    </select>
+  </label>
+
+  <label class="toggle-label">
+    <input type="checkbox" id="filterDomestic"> 国産のみ
+  </label>
+
+  <label class="toggle-label">
+    <input type="checkbox" id="filterHasGramPrice"> 単価あるもののみ
+  </label>
+
+  <button class="btn-reset" id="btnReset">リセット</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th data-col="order_no">注文番号<span class="arrow"></span></th>
+        <th data-col="category">カテゴリ<span class="arrow"></span></th>
+        <th data-col="name">商品名<span class="arrow"></span></th>
+        <th data-col="maker">メーカー<span class="arrow"></span></th>
+        <th data-col="weight_text">容量<span class="arrow"></span></th>
+        <th data-col="price_taxin">税込価格<span class="arrow"></span></th>
+        <th data-col="gram_price">g単価<span class="arrow"></span></th>
+        <th data-col="origin">産地<span class="arrow"></span></th>
+        <th class="no-sort">選ぶ<span class="arrow"></span></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <div class="no-results" id="noResults" style="display:none">該当する商品がありません</div>
+</div>
+
+<div class="pagination">
+  <button id="btnFirst">«</button>
+  <button id="btnPrev">‹</button>
+  <span class="page-info" id="pageInfo"></span>
+  <button id="btnNext">›</button>
+  <button id="btnLast">»</button>
+</div>
+
+<!-- 注文バー -->
+<div class="order-bar hidden" id="orderBar" onclick="openSheet()">
+  <span>🛒 注文リスト</span>
+  <span class="order-bar-count" id="orderBarCount">0件</span>
+</div>
+
+<!-- オーバーレイ＋シート -->
+<div class="sheet-overlay" id="sheetOverlay" onclick="closeSheet()"></div>
+<div class="order-sheet" id="orderSheet">
+  <div class="sheet-title">🛒 注文リスト</div>
+  <div id="sheetItems"></div>
+  <button class="copy-btn" onclick="copyToLine()">📋 LINEに貼るようにコピー</button>
+  <div class="copy-done" id="copyDone">✅ コピーしました！LINEに貼り付けてください</div>
+  <button class="close-sheet-btn" onclick="closeSheet()">閉じる</button>
+</div>
+
+<script>
+const PAGE = 50;
+let filtered = [];
+let page = 1;
+let sortKey = 'gram_price';
+let sortDir = 'asc';
+
+// ===== 選ぶ機能 =====
+const selectedItems = new Map(); // safeKey → 商品オブジェクト
+
+function toggleSelectByKey(btn) {
+  var safeKey = btn.dataset.key;
+  var row = btn.closest('tr');
+  if (selectedItems.has(safeKey)) {
+    selectedItems.delete(safeKey);
+    row.classList.remove('row-selected');
+    btn.classList.remove('selected');
+    btn.textContent = '選ぶ';
+  } else {
+    var origKey = decodeURIComponent(safeKey);
+    var product = ALL_PRODUCTS.find(function(p) {
+      return (p.order_no || (p.name + '_' + p.price)) === origKey;
+    });
+    if (product) selectedItems.set(safeKey, product);
+    row.classList.add('row-selected');
+    btn.classList.add('selected');
+    btn.textContent = '✓ 選んだ';
+  }
+  updateOrderBar();
+}
+
+function updateOrderBar() {
+  var bar = document.getElementById('orderBar');
+  var cnt = document.getElementById('orderBarCount');
+  var n = selectedItems.size;
+  bar.classList.toggle('hidden', n === 0);
+  cnt.textContent = n + '件';
+}
+
+function openSheet() {
+  var sheet   = document.getElementById('orderSheet');
+  var overlay = document.getElementById('sheetOverlay');
+  var itemsEl = document.getElementById('sheetItems');
+  var html = '';
+  selectedItems.forEach(function(p, safeKey) {
+    var taxin  = p.price_taxin ? '（税込 ¥' + Number(p.price_taxin).toLocaleString() + '）' : '';
+    var weight = p.weight_text ? '　' + p.weight_text : '';
+    html += '<div class="sheet-item">'
+          +   '<div class="sheet-item-info">'
+          +     '<div class="s-name">' + p.name + weight + '</div>'
+          +     '<div class="s-sub">¥' + Number(p.price).toLocaleString() + taxin
+          +       '　注文番号：' + (p.order_no || '—') + '</div>'
+          +   '</div>'
+          +   '<button class="sheet-item-remove" data-key="' + safeKey + '" onclick="removeFromSheet(this)">✕</button>'
+          + '</div>';
+  });
+  itemsEl.innerHTML = html;
+  document.getElementById('copyDone').style.display = 'none';
+  sheet.style.display = 'block';
+  overlay.classList.add('open');
+}
+
+function removeFromSheet(btn) {
+  var safeKey = btn.dataset.key;
+  selectedItems.delete(safeKey);
+  // テーブル上のボタン状態も戻す
+  var cardBtn = document.querySelector('[data-key="' + safeKey + '"]');
+  if (cardBtn) {
+    cardBtn.closest('tr').classList.remove('row-selected');
+    cardBtn.classList.remove('selected');
+    cardBtn.textContent = '選ぶ';
+  }
+  updateOrderBar();
+  openSheet();
+}
+
+function closeSheet() {
+  document.getElementById('orderSheet').style.display = 'none';
+  document.getElementById('sheetOverlay').classList.remove('open');
+}
+
+function copyToLine() {
+  var lines = ['【今週のトドック注文リスト】', ''];
+  selectedItems.forEach(function(p) {
+    var weight = p.weight_text ? '　' + p.weight_text : '';
+    var taxin  = p.price_taxin ? '（税込¥' + Number(p.price_taxin).toLocaleString() + '）' : '';
+    lines.push('・' + p.name + weight + '　¥' + Number(p.price).toLocaleString() + taxin + '　注文番号：' + (p.order_no || '—'));
+  });
+  lines.push('', '合計 ' + selectedItems.size + '件');
+  var text = lines.join('\n');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      document.getElementById('copyDone').style.display = 'block';
+    });
+  } else {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    document.getElementById('copyDone').style.display = 'block';
+  }
+}
+
+// ===== 表示・フィルター =====
+
+// カテゴリ選択肢を生成
+const catCount = {};
+ALL_PRODUCTS.forEach(p => { catCount[p.category] = (catCount[p.category] || 0) + 1; });
+Object.keys(catCount).sort().forEach(cat => {
+  const o = document.createElement('option');
+  o.value = cat;
+  o.textContent = cat + '（' + catCount[cat] + '）';
+  document.getElementById('filterCategory').appendChild(o);
+});
+
+function filter() {
+  const cat   = document.getElementById('filterCategory').value;
+  const q     = document.getElementById('filterSearch').value.trim().toLowerCase();
+  const dom   = document.getElementById('filterDomestic').checked;
+  const hasGP = document.getElementById('filterHasGramPrice').checked;
+
+  filtered = ALL_PRODUCTS.filter(p => {
+    if (cat  && p.category !== cat) return false;
+    if (q    && !((p.name + p.maker).toLowerCase().includes(q))) return false;
+    if (dom  && !p.is_domestic) return false;
+    if (hasGP && p.gram_price === null) return false;
+    return true;
+  });
+
+  sort();
+}
+
+function sort() {
+  const k = sortKey, d = sortDir;
+  filtered.sort((a, b) => {
+    let va = a[k], vb = b[k];
+    if (va === null && vb === null) return 0;
+    if (va === null) return 1;
+    if (vb === null) return -1;
+    if (typeof va === 'string') va = va.toLowerCase();
+    if (typeof vb === 'string') vb = vb.toLowerCase();
+    return d === 'asc' ? (va < vb ? -1 : va > vb ? 1 : 0)
+                       : (va > vb ? -1 : va < vb ? 1 : 0);
+  });
+  page = 1;
+  render();
+}
+
+function render() {
+  const total = filtered.length;
+  document.getElementById('resultCount').textContent = total.toLocaleString() + ' 件';
+  document.getElementById('noResults').style.display = total === 0 ? '' : 'none';
+
+  // カテゴリ内最安単価（絞り込み後）
+  const best = {};
+  filtered.forEach(p => {
+    if (p.gram_price !== null && (!(p.category in best) || p.gram_price < best[p.category]))
+      best[p.category] = p.gram_price;
+  });
+
+  const slice = filtered.slice((page - 1) * PAGE, page * PAGE);
+  document.getElementById('tbody').innerHTML = slice.map(p => {
+    const isBest = p.gram_price !== null && p.gram_price === best[p.category];
+    const gp = p.gram_price !== null
+      ? '<td class="num"><span class="gram-val">' + p.gram_price.toFixed(1) + ' 円/g' + (isBest ? ' ★' : '') + '</span></td>'
+      : '<td class="num gram-null">−</td>';
+    const badge = p.is_domestic
+      ? '<span class="badge badge-domestic">' + (p.origin || '国産') + '</span>'
+      : '<span class="badge badge-import">'   + (p.origin || '産地不明') + '</span>';
+
+    var safeKey = encodeURIComponent(p.order_no || (p.name + '_' + p.price));
+    var isSelected = selectedItems.has(safeKey);
+    var selectLabel = isSelected ? '✓ 選んだ' : '選ぶ';
+    var selectCls   = isSelected ? 'select-btn selected' : 'select-btn';
+    var rowCls = (isBest ? 'best' : '') + (isSelected ? ' row-selected' : '');
+
+    return '<tr' + (rowCls.trim() ? ' class="' + rowCls.trim() + '"' : '') + '>'
+      + '<td class="order-no">' + p.order_no + '</td>'
+      + '<td class="cat-cell">' + p.category + '</td>'
+      + '<td class="name-cell">' + p.name + '</td>'
+      + '<td class="maker-cell">' + p.maker + '</td>'
+      + '<td>' + (p.weight_text || '−') + '</td>'
+      + '<td class="num">' + p.price_taxin.toLocaleString() + ' 円</td>'
+      + gp
+      + '<td>' + badge + '</td>'
+      + '<td><button class="' + selectCls + '" data-key="' + safeKey + '" onclick="toggleSelectByKey(this)">' + selectLabel + '</button></td>'
+      + '</tr>';
+  }).join('');
+
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  document.getElementById('pageInfo').textContent =
+    total > 0 ? page + ' / ' + pages + ' ページ（' + total.toLocaleString() + ' 件）' : '0 件';
+  document.getElementById('btnFirst').disabled = page === 1;
+  document.getElementById('btnPrev').disabled  = page === 1;
+  document.getElementById('btnNext').disabled  = page >= pages;
+  document.getElementById('btnLast').disabled  = page >= pages;
+}
+
+// フィルター操作
+['filterCategory','filterSearch','filterDomestic','filterHasGramPrice'].forEach(id => {
+  document.getElementById(id).addEventListener('change', filter);
+  document.getElementById(id).addEventListener('input',  filter);
+});
+
+// 並び順セレクト
+document.getElementById('sortSelect').addEventListener('change', function() {
+  [sortKey, sortDir] = this.value.split('|');
+  updateSortUI();
+  filter();
+});
+
+// ヘッダクリックソート
+document.querySelectorAll('thead th[data-col]').forEach(th => {
+  th.addEventListener('click', function() {
+    const col = this.dataset.col;
+    sortDir = sortKey === col && sortDir === 'asc' ? 'desc' : 'asc';
+    sortKey = col;
+    updateSortUI();
+    filter();
+  });
+});
+
+function updateSortUI() {
+  document.querySelectorAll('thead th[data-col]').forEach(th => {
+    th.classList.remove('sorted');
+    th.querySelector('.arrow').textContent = '';
+  });
+  const active = document.querySelector('thead th[data-col="' + sortKey + '"]');
+  if (active) {
+    active.classList.add('sorted');
+    active.querySelector('.arrow').textContent = sortDir === 'asc' ? ' ▲' : ' ▼';
+  }
+}
+
+// ページネーション
+document.getElementById('btnFirst').addEventListener('click', () => { page = 1; render(); });
+document.getElementById('btnPrev').addEventListener('click',  () => { page--; render(); });
+document.getElementById('btnNext').addEventListener('click',  () => { page++; render(); });
+document.getElementById('btnLast').addEventListener('click',  () => {
+  page = Math.ceil(filtered.length / PAGE); render();
+});
+
+// リセット
+document.getElementById('btnReset').addEventListener('click', () => {
+  document.getElementById('filterCategory').value = '';
+  document.getElementById('filterSearch').value   = '';
+  document.getElementById('filterDomestic').checked      = false;
+  document.getElementById('filterHasGramPrice').checked  = false;
+  document.getElementById('sortSelect').value = 'gram_price|asc';
+  sortKey = 'gram_price'; sortDir = 'asc';
+  updateSortUI();
+  filter();
+});
+
+// 初期表示
+updateSortUI();
+filter();
+</script>
+</body>
+</html>
