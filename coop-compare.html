@@ -598,7 +598,7 @@ function render() {
       + '<td class="name-cell">' + p.name + '</td>'
       + '<td class="maker-cell">' + p.maker + '</td>'
       + '<td>' + (p.weight_text || '−') + '</td>'
-      + '<td class="num">' + p.price_taxin.toLocaleString() + ' 円</td>'
+      + '<td class="num">' + (p.price_taxin != null ? Number(p.price_taxin).toLocaleString() + ' 円' : '−') + '</td>'
       + gp
       + '<td>' + badge + '</td>'
       + '<td><button class="' + selectCls + '" data-key="' + safeKey + '" onclick="toggleSelectByKey(this)">' + selectLabel + '</button></td>'
