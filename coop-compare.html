@@ -292,7 +292,13 @@
 <div class="filters">
   <label>
     カテゴリ
-    <select id="filterCategory">
+    <select id="filterMain">
+      <option value="">すべて</option>
+    </select>
+  </label>
+  <label id="subLabel" style="display:none">
+    サブカテゴリ
+    <select id="filterSub">
       <option value="">すべて</option>
     </select>
   </label>
@@ -475,24 +481,64 @@ function copyToLine() {
 
 // ===== 表示・フィルター =====
 
-// カテゴリ選択肢を生成
-const catCount = {};
-ALL_PRODUCTS.forEach(p => { catCount[p.category] = (catCount[p.category] || 0) + 1; });
-Object.keys(catCount).sort().forEach(cat => {
-  const o = document.createElement('option');
-  o.value = cat;
-  o.textContent = cat + '（' + catCount[cat] + '）';
-  document.getElementById('filterCategory').appendChild(o);
+// カテゴリ構造を構築（"親 > 子" 形式に対応）
+const mainCats = [];
+const subCatsMap = {}; // main → [sub, ...]
+ALL_PRODUCTS.forEach(p => {
+  const parts = p.category.split(' > ');
+  const main = parts[0];
+  const sub  = parts[1] || null;
+  if (!mainCats.includes(main)) mainCats.push(main);
+  if (sub) {
+    if (!subCatsMap[main]) subCatsMap[main] = [];
+    if (!subCatsMap[main].includes(sub)) subCatsMap[main].push(sub);
+  }
 });
 
+// 大カテゴリの選択肢を生成
+mainCats.forEach(main => {
+  const count = ALL_PRODUCTS.filter(p => p.category.split(' > ')[0] === main).length;
+  const o = document.createElement('option');
+  o.value = main;
+  o.textContent = main + '（' + count + '）';
+  document.getElementById('filterMain').appendChild(o);
+});
+
+// 大カテゴリ変更時：サブカテゴリを更新
+document.getElementById('filterMain').addEventListener('change', function() {
+  const main    = this.value;
+  const subSel  = document.getElementById('filterSub');
+  const subLbl  = document.getElementById('subLabel');
+  subSel.innerHTML = '<option value="">すべて</option>';
+  if (main && subCatsMap[main]) {
+    subCatsMap[main].forEach(sub => {
+      const count = ALL_PRODUCTS.filter(p => p.category === main + ' > ' + sub).length;
+      const o = document.createElement('option');
+      o.value = sub;
+      o.textContent = sub + '（' + count + '）';
+      subSel.appendChild(o);
+    });
+    subLbl.style.display = '';
+  } else {
+    subLbl.style.display = 'none';
+  }
+  filter();
+});
+document.getElementById('filterSub').addEventListener('change', filter);
+
 function filter() {
-  const cat   = document.getElementById('filterCategory').value;
+  const main  = document.getElementById('filterMain').value;
+  const sub   = document.getElementById('filterSub').value;
   const q     = document.getElementById('filterSearch').value.trim().toLowerCase();
   const dom   = document.getElementById('filterDomestic').checked;
   const hasGP = document.getElementById('filterHasGramPrice').checked;
 
   filtered = ALL_PRODUCTS.filter(p => {
-    if (cat  && p.category !== cat) return false;
+    const parts = p.category.split(' > ');
+    const pMain = parts[0];
+    const pSub  = parts[1] || null;
+    if (main && pMain !== main) return false;
+    if (sub  && pSub  !== sub)  return false;
     if (q    && !((p.name + p.maker).toLowerCase().includes(q))) return false;
     if (dom  && !p.is_domestic) return false;
     if (hasGP && p.gram_price === null) return false;
@@ -569,7 +615,7 @@ function render() {
 }
 
 // フィルター操作
-['filterCategory','filterSearch','filterDomestic','filterHasGramPrice'].forEach(id => {
+['filterSearch','filterDomestic','filterHasGramPrice'].forEach(id => {
   document.getElementById(id).addEventListener('change', filter);
   document.getElementById(id).addEventListener('input',  filter);
 });
@@ -614,7 +660,9 @@ document.getElementById('btnLast').addEventListener('click',  () => {
 
 // リセット
 document.getElementById('btnReset').addEventListener('click', () => {
-  document.getElementById('filterCategory').value = '';
+  document.getElementById('filterMain').value = '';
+  document.getElementById('filterSub').innerHTML = '<option value="">すべて</option>';
+  document.getElementById('subLabel').style.display = 'none';
   document.getElementById('filterSearch').value   = '';
   document.getElementById('filterDomestic').checked      = false;
   document.getElementById('filterHasGramPrice').checked  = false;
